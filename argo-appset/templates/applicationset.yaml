@@ -1,0 +1,87 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: application-todo
+  # Labels for the ApplicationSet resource itself
+  labels:
+    appset.argocd.argoproj.io/name: application-todo
+    environment: shared # Example: Label for the environment this AppSet manages
+    owner: platform-team # Example: Who owns this ApplicationSet definition
+    managed-by: argocd-application-set # Specific to distinguish AppSet resources
+  # Annotations for the ApplicationSet resource itself
+  annotations:
+    argocd.argoproj.io/sync-options: "Validate=false" # Example: Apply to the AppSet reconciliation
+    description: "Dynamically generates applications for various microservices dependencies"
+    documentation: "https://confluence.example.com/pages/viewpage.action?pageId=12345"
+spec:
+  generators:
+  - list:
+      elements:
+      {{- range $key, $value := .Values.dependencies }}
+        - name: {{ $key }}
+          chart: {{ $value.chart | default "" }} # Optional chart with default ""
+          version: {{ $value.version }}
+          # Ensure rawValues and valueFiles are dicts/lists even if absent
+          rawValues: {{ toYaml (default dict $value.Values) | nindent 12 | trim }}
+          valueFiles: {{ toYaml (default list $value.ValueFiles) | nindent 12 | trim }}
+          clusterLabelValue: {{ $value.targetClusterLabelValue }}
+          # Pass dependency-specific labels and annotations as YAML strings for later parsing
+          dependencyLabels: {{ toYaml (default dict $value.labels) | nindent 12 | trim }}
+          dependencyAnnotations: {{ toYaml (default dict $value.annotations) | nindent 12 | trim }}
+      {{- end }}
+  - cluster:
+      selector:
+        matchLabels:
+          clusterName: '{{ .clusterLabelValue }}' # Dynamically uses the value from the list generator
+  template:
+    metadata:
+      name: '{{.name}}-app'
+      # Dynamic Labels and Annotations for EACH GENERATED APPLICATION
+      {{- $globalLabels := default dict .Values.global.labels -}}
+      {{- $globalAnnotations := default dict .Values.global.annotations -}}
+      
+      {{- /* Convert dependency labels/annotations back to dicts from the string passed by generator */ -}}
+      {{- $depLabels := fromYaml .dependencyLabels -}}
+      {{- $depAnnotations := fromYaml .dependencyAnnotations -}}
+      
+      {{- /* Merge global and dependency labels/annotations using 'merge' (shallow merge).
+          Rightmost argument (dependency-specific) takes precedence if keys collide. */ -}}
+      {{- $allLabels := merge $globalLabels $depLabels -}}
+      {{- $allAnnotations := merge $globalAnnotations $depAnnotations -}}
+      
+      labels:
+        {{- range $k, $v := $allLabels }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+      annotations:
+        {{- range $k, $v := $allAnnotations }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+    spec:
+      project: '{{ .Values.global.project | default "default" }}' # Default project if not specified globally
+      sources:
+        # Source 1: Helm Chart Repository
+        - repoURL: '{{ .Values.global.helmRepoURL | default "" }}' # Global Helm repo URL, or empty string default
+          chart: '{{.chart}}'
+          targetRevision: '{{.version}}'
+          helm:
+            releaseName: '{{ include "application.releaseName" (dict "name" .name "Values" .Values) }}' # Call helper for releaseName
+            values: |
+                {{.rawValues}} # Injects the raw values defined directly in values.yaml        
+            valueFiles:
+            {{- range $file := .valueFiles }}
+                - $values/{{ $file }} # Prepend the 'values' ref to the file path
+            {{- end }}
+        # Source 2: Git Repository for ValueFiles
+        - repoURL: '{{ .Values.global.valueFilesGit | default "" }}' # Global Git repo URL for value files, or empty string default
+          targetRevision: '{{ .Values.global.valueFilesGitTargetRevision | default "HEAD" }}' # Make configurable, default to HEAD
+          ref: values # Assigns the name 'values' to this source
+      destination:
+        server: '{{ .server }}' # Uses the API server from the matching cluster generator
+        namespace: '{{ .Values.global.namespace | default "default" }}' # Default namespace if not specified globally
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

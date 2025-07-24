@@ -1,0 +1,39 @@
+
+global:
+  project: my-argocd-project
+  namespace: my-app-namespace
+  helmRepoURL: https://charts.example.com/stable
+  valueFilesGit: https://git.example.com/org/common-values.git
+  labels: {}
+  annotations: {}
+  assetID: ""
+  owner: {}
+  clusterName: ""
+dependencies:
+  todoapp:
+    chart: stateless-chart # If omitted, defaults to ""
+    version: 1.0.0
+    Values:
+      - key: "value"
+    ValueFiles:
+      - common/app-defaults.yaml
+      - todoapp/config.yaml
+    targetClusterLabelValue: cluster-abc
+    labels:
+      app: todoapp
+    annotations:
+      argocd.argoproj.io/pre-sync: "true"
+  s3:
+    chart: s3 # If omitted, defaults to ""
+    version: 1.0.0
+    Values:
+      - s3_config:
+          bucketName: my-unique-bucket
+    ValueFiles:
+      - common/app-defaults.yaml
+      - s3/config.yaml
+    targetClusterLabelValue: cluster-def
+    labels:
+      app: s3-service
+    annotations:
+      argocd.argoproj.io/description: "S3 bucket for data storage"

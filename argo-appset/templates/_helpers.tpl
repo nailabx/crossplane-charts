@@ -1,52 +1,13 @@
-{{/*
-Expand the name of the chart.
-*/}}
-{{- define "argo-appset.name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{/*
-Create a default fully qualified app name.
-We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
-If release name contains chart name it will be used as a full name.
-*/}}
-{{- define "argo-appset.fullname" -}}
-{{- if .Values.fullnameOverride }}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
-{{- if contains $name .Release.Name }}
-{{- .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
-{{- end }}
-{{- end }}
-{{- end }}
-
-{{/*
-Create chart name and version as used by the chart label.
-*/}}
-{{- define "argo-appset.chart" -}}
-{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{/*
-Common labels
-*/}}
-{{- define "argo-appset.labels" -}}
-helm.sh/chart: {{ include "argo-appset.chart" . }}
-{{ include "argo-appset.selectorLabels" . }}
-{{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-{{- end }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- end }}
-
-{{/*
-Selector labels
-*/}}
-{{- define "argo-appset.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "argo-appset.name" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
-{{- end }}
-
+{{- define "application.releaseName" -}}
+{{- /*
+  Generates a Helm release name.
+  Context: (dict "name" .name "Values" .Values)
+  Example: <appname>-<global-project-hash>
+*/ -}}
+{{- $appName := .name -}}
+{{- $globalProject := .Values.global.project | default "default" -}}
+{{- $globalNamespace := .Values.global.namespace | default "default" -}}
+{{- $configString := printf "%s-%s" $globalProject $globalNamespace -}}
+{{- $configHash := $configString | sha256sum | trunc 8 -}}
+{{- printf "%s-%s" $appName $configHash -}}
+{{- end -}}

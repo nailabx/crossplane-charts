@@ -1,8 +1,18 @@
 apiVersion: v2
 name: argo-appset
-description: A Helm chart for Kubernetes
+description: A Helm chart for creating ArgoCD ApplicationSets that can deploy multiple applications from dependencies defined in values.yaml
 
 type: application
 
 version: 0.1.0
 appVersion: "1.16.0"
+keywords:
+  - argocd
+  - applicationset
+  - gitops
+  - helm
+home: https://github.com/nailabx/crossplane-charts
+sources:
+  - https://github.com/nailabx/crossplane-charts
+maintainers:
+  - name: nailabx

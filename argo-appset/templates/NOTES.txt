@@ -1,1 +1,23 @@
 1. Get the argocd URL by running these commands:
+
+   kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+2. The ApplicationSet has been deployed with the following configuration:
+   - Name: {{ include "argo-appset.fullname" . }}
+   - Project: {{ .Values.global.project | default "default" }}
+   - Cluster: {{ .Values.global.clusterName | default "in-cluster" }}
+   - Namespace: {{ .Values.global.namespace | default "default" }}
+
+3. Applications will be generated for each dependency defined in your values.yaml:
+   {{- range $key, $value := .Values.dependencies }}
+   - {{ $key }} ({{ $value.kind }})
+   {{- end }}
+
+4. To customize the deployment, edit the values.yaml file and upgrade the release:
+   helm upgrade {{ .Release.Name }} . -f values.yaml
+
+5. To view the generated applications:
+   kubectl get applications -n argocd
+
+6. To view the ApplicationSet:
+   kubectl get applicationset -n argocd {{ include "argo-appset.fullname" . }}

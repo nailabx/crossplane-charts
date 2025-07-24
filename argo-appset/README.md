@@ -86,7 +86,14 @@ spec:
           version: {{ $value.version }}
           rawValues: {{ toYaml $value.Values | nindent 12 | trim }} # Renamed to avoid conflict with valueFiles
           valueFiles: {{ toYaml $value.ValueFiles | nindent 12 | trim }}
+          # Pass the cluster label value from values.yaml to the template
+          clusterLabelValue: {{ $value.targetClusterLabelValue }}
       {{- end }}
+  - cluster:
+      selector:
+        matchLabels:
+          # This label 'clusterName' should exist on your registered Argo CD clusters
+          clusterName: '{{ .clusterLabelValue }}' # Dynamically uses the value from the list generator
   template:
     metadata:
       name: '{{.name}}-app'
@@ -110,7 +117,7 @@ spec:
           targetRevision: HEAD # Or a specific branch/tag (e.g., main, v1.0.0)
           ref: values
       destination:
-        name: '{{ .Values.global.clusterName }}' # Uses the global.clusterName from your values
+        name: '{{ .server }}' 
         namespace: {{ .Values.global.namespace }} # default will be default namespace
       syncPolicy:
         automated:
